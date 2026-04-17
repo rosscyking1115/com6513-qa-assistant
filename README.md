@@ -1,23 +1,55 @@
-# Project Overview
-This project is a Quality Assurance Assistant that aims to automate testing processes.
+# COM6513 QA Assistant
 
-## Setup Instructions
-1. Clone the repository:
+Extractive document question-answering pipeline for the COM6513/COM4513 mid-semester assignment.
+
+## Setup (macOS/Linux)
+
+1. Open a terminal in the project root.
+2. Create a Python virtual environment (Python 3.10 recommended):
    ```bash
-   git clone https://github.com/rosscyking1115/com6513-qa-assistant.git
+   /opt/miniconda3/envs/nlp/bin/python -m venv .venv
    ```
-2. Navigate to the project directory:
+   If you already have Python 3.10 on PATH, you can also use:
    ```bash
-   cd com6513-qa-assistant
+   python3.10 -m venv .venv
    ```
-3. Install the required dependencies:
+3. Activate the environment:
    ```bash
-   npm install
+   source .venv/bin/activate
+   ```
+4. Install dependencies:
+   ```bash
+   pip install --upgrade pip
+   pip install -r requirements.txt
    ```
 
-## Usage Guide
-To use the QA Assistant, run the following command:
+## Run
+
+Generate predictions from `data/input.json`:
+
 ```bash
-npm start
+python src/qa_system.py
 ```
-This will initiate the testing process and output the results to the console.
+
+Predictions are written to `data/predictions.json`.
+
+## Evaluate
+
+Compare predictions against gold answers:
+
+```bash
+python src/qa_evaluate.py
+```
+
+## Optional: Rebuild Dataset from PDFs
+
+If needed, place PDFs in `data/raw/` and run:
+
+```bash
+python src/build_dataset.py
+```
+
+This writes:
+
+- `data/input.json`
+- `data/gold_answers.json`

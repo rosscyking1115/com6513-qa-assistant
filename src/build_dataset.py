@@ -1,23 +1,10 @@
-"""
-build_dataset.py
-----------------
-Extracts clean text from Wikipedia PDFs and assembles input.json
-for the COM6513 QA assignment development dataset.
-
-Usage:
-    python src/build_dataset.py
-
-Place your three PDF files in a folder called 'data/raw/' before running.
-Output: data/input.json
-"""
-
 import json
 import re
 import os
-import fitz  # PyMuPDF
+import fitz
 
 
-# ── Configuration ────────────────────────────────────────────────────────────
+# Configuration
 
 PDF_FILES = {
     "computer_security": "data/raw/Computer_security.pdf",
@@ -27,12 +14,12 @@ PDF_FILES = {
 
 OUTPUT_PATH = "data/input.json"
 
-# ── QA Pairs ─────────────────────────────────────────────────────────────────
-# Format: (question_id, document_key, question, gold_answer)
-# gold_answer is stored here for your own evaluation — NOT sent to the model.
 
-QA_PAIRS = [
-    # ── Computer Security (10 questions) ────────────────────────────────────
+# QA combinations
+#(question_id, document_key, question, gold_answer)
+
+QA_COMS = [
+    # Computer Security (10 questions)
     ("q01", "computer_security",
      "What is computer security also known as?",
      "cybersecurity, digital security, or information technology (IT) security"),
@@ -73,7 +60,7 @@ QA_PAIRS = [
      "What is the CIA triad considered the foundation of?",
      "information security"),
 
-    # ── Stuxnet (10 questions) ───────────────────────────────────────────────
+    # Stuxnet (10 questions)
     ("q11", "stuxnet",
      "When was Stuxnet first uncovered?",
      "17 June 2010"),
@@ -114,7 +101,7 @@ QA_PAIRS = [
      "By how much did the centrifuge operational capacity at Natanz drop?",
      "30 percent"),
 
-    # ── WannaCry (10 questions) ──────────────────────────────────────────────
+    # WannaCry (10 questions)
     ("q21", "wannacry",
      "What time did the WannaCry attack begin?",
      "07:44 UTC on 12 May 2017"),
@@ -159,19 +146,14 @@ QA_PAIRS = [
 
 # ── PDF Text Extraction ───────────────────────────────────────────────────────
 
-def extract_pdf_text(pdf_path: str) -> str:
-    """
-    Extract main body text from a Wikipedia PDF.
-    Stops before the References / See Also section.
-    Strips citation numbers like [1], [23], [123].
-    """
+def extract_pdf_text(pdf_path):
+    """Extract main body from a Wikipedia PDF, just before References."""
     doc = fitz.open(pdf_path)
     pages_text = []
 
     for page in doc:
         text = page.get_text()
 
-        # Stop at References or See Also section
         for stop_marker in ["\nReferences\n", "\nSee also\n", "\nExternal links\n"]:
             idx = text.lower().find(stop_marker.lower())
             if idx != -1:
@@ -186,15 +168,10 @@ def extract_pdf_text(pdf_path: str) -> str:
     return clean_text("\n".join(pages_text))
 
 
-def clean_text(text: str) -> str:
+def clean_text(text):
     """Remove citation numbers and normalise whitespace."""
-    # Remove citation numbers: [1], [23], [123]
     text = re.sub(r'\[\d+\]', '', text)
-    # Remove the Wikipedia header (first few lines)
-    text = re.sub(r'Wikipedia.*?encyclopedia\n', '', text, flags=re.DOTALL | re.IGNORECASE)
-    # Collapse multiple blank lines
     text = re.sub(r'\n{3,}', '\n\n', text)
-    # Collapse multiple spaces
     text = re.sub(r'[ \t]+', ' ', text)
     return text.strip()
 
@@ -202,31 +179,25 @@ def clean_text(text: str) -> str:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    # Create output directory
     os.makedirs("data", exist_ok=True)
 
-    # Step 1: Extract text from each PDF
+    # Extract text from each PDF
     print("Extracting text from PDFs...")
     documents = {}
     for key, pdf_path in PDF_FILES.items():
         if not os.path.exists(pdf_path):
-            print(f"  [WARNING] File not found: {pdf_path}")
-            print(f"            Place the PDF at '{pdf_path}' and re-run.")
+            print("  WARNING: File not found:", pdf_path)
             documents[key] = ""
             continue
 
         text = extract_pdf_text(pdf_path)
         documents[key] = text
+        print(" ", key, ":", len(text.split()), "words")
 
-        # Rough token estimate (1 token ≈ 0.75 words)
-        word_count = len(text.split())
-        token_estimate = int(word_count / 0.75)
-        print(f"  {key}: {word_count} words (~{token_estimate} tokens)")
-
-    # Step 2: Build input.json
+    # Build input.json
     print("\nBuilding input.json...")
     dataset = []
-    for qid, doc_key, question, _ in QA_PAIRS:
+    for qid, doc_key, question, _ in QA_COMS:
         dataset.append({
             "question_id": qid,
             "question":    question,
@@ -235,17 +206,16 @@ def main():
 
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         json.dump(dataset, f, indent=2, ensure_ascii=False)
+    print("  Saved", len(dataset), "QA pairs to", OUTPUT_PATH)
 
-    print(f"  Saved {len(dataset)} QA pairs to '{OUTPUT_PATH}'")
-
-    # Step 3: Save gold answers separately (for your own evaluation use)
-    gold = [{"question_id": qid, "answer": ans} for qid, _, _, ans in QA_PAIRS]
+    # Save gold answers (only for local evaluation)
+    gold = [{"question_id": qid, "answer": ans} for qid, _, _, ans in QA_COMS]
     gold_path = "data/gold_answers.json"
     with open(gold_path, "w", encoding="utf-8") as f:
         json.dump(gold, f, indent=2, ensure_ascii=False)
+    print("  Saved gold answers to", gold_path)
 
-    print(f"  Saved gold answers to '{gold_path}' (for your evaluation only)")
-    print("\nDone! Your dataset is ready.")
+    print("\nDone.")
 
 
 if __name__ == "__main__":

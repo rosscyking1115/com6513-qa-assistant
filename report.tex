@@ -1,0 +1,86 @@
+% COM6513/COM4513 Mid-Semester Assignment — Report
+% Compile with pdflatex on Overleaf (blank project, no extra packages needed)
+
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[a4paper, top=1.8cm, bottom=1.8cm, left=2cm, right=2cm]{geometry}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{enumitem}
+
+\titlespacing{\section}{0pt}{6pt}{3pt}
+\titleformat{\section}{\normalfont\bfseries}{\thesection.}{0.5em}{}
+\setlength{\parskip}{3pt}
+\setlength{\parindent}{0pt}
+\setlist[itemize]{noitemsep, topsep=2pt, leftmargin=*}
+\pagestyle{plain}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+\begin{center}
+  {\large \textbf{COM4513 / COM6513 — Mid-Semester Assignment}} \\[4pt]
+  {\normalsize Building a Document Question Answering Assistant}
+\end{center}
+
+\noindent
+\textbf{Name:} Cheng-Yuan King \hfill \textbf{Student ID:} [250195169]
+
+\vspace{4pt}
+\hrule
+\vspace{6pt}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{1) System Description}
+
+\begin{itemize}
+  \item \textbf{Chunking strategy:} Sentence-based sliding window. Documents are split into sentences using a regex on sentence-ending punctuation. Sentences are grouped into overlapping windows of \textbf{5 sentences} with a stride of \textbf{3 sentences} (2-sentence overlap between consecutive chunks).
+  \item \textbf{QA model:} \texttt{deepset/roberta-base-squad2} — a RoBERTa-base model fine-tuned on SQuAD 2.0, loaded via the HuggingFace \texttt{pipeline("question-answering")} interface.
+  \item \textbf{Answer selection:} The answer span with the \textbf{highest raw confidence score} across all chunks is returned as the final prediction.
+\end{itemize}
+
+\vspace{2pt}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{2) Design Choices}
+
+\noindent\textbf{Decision 1 — What:} Sentence-based chunking rather than fixed-length token or character windows. \textbf{Why:} Sentence boundaries preserve grammatical and semantic coherence, ensuring the model always receives complete, interpretable contexts. Fixed-length splits risk cutting mid-sentence, which can obscure the answer span or degrade model confidence.
+
+\vspace{4pt}
+
+\noindent\textbf{Decision 2 — What:} Selecting the answer by highest raw confidence score across all chunks. \textbf{Why:} The model's confidence score jointly reflects span quality and context–question relevance, making it a reliable proxy for answer correctness without requiring any secondary re-ranking step or score normalisation.
+
+\vspace{2pt}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{3) Error Analysis}
+
+\noindent\textbf{Incorrect Example 1:}\\
+\textit{Question:} What is eavesdropping?\\
+\textit{Gold Answer:} the act of surreptitiously listening to a private computer conversation, usually between hosts on a network\\
+\textit{Prediction:} the car's onboard microphones\\
+\textit{Why wrong:} The document contains multiple passages that mention ``listening''; the chunk holding the correct definitional sentence received a lower model confidence score than a chunk about vehicle surveillance, causing the wrong span to be selected.
+
+\vspace{4pt}
+
+\noindent\textbf{Incorrect Example 2:}\\
+\textit{Question:} What programming tool was used to create WannaCry?\\
+\textit{Gold Answer:} Microsoft Visual C++ 6.0\\
+\textit{Prediction:} Wanakiwi\\
+\textit{Why wrong:} Wanakiwi (a decryption tool) appears in close proximity to programming-related language in the same chunk as the gold answer. Without domain-specific fine-tuning, the model cannot reliably distinguish the correct named entity from a confusable distractor in the same context window.
+
+\vspace{4pt}
+
+\noindent\textbf{Improvement Suggestion:} Reducing the chunk window size for very long documents (e.g., window = 3 sentences for documents over 8{,}000 words) would lower distractor density per chunk, reducing the risk of the model selecting a plausible but incorrect span from a crowded context.
+
+\vspace{4pt}
+\hrule
+\vspace{2pt}
+{\footnotesize
+\textbf{Development results:} EM = 43.33, F1 = 61.42 over 30 questions (3 Wikipedia documents).
+Code: \texttt{src/qa\_system.py} (pipeline), \texttt{src/build\_dataset.py} (data), \texttt{src/qa\_evaluate.py} (evaluation).
+}
+
+\end{document}
