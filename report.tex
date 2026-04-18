@@ -34,18 +34,22 @@
 \section*{1) System Description}
 
 \begin{itemize}
-  \item \textbf{Chunking strategy:} Sentence-based sliding window. Each document is split into sentences using a regular expression on sentence-ending punctuation. Sentences are grouped into overlapping windows of \textbf{5 sentences} with a stride of \textbf{3 sentences}.
-  \item \textbf{QA model:} \texttt{deepset/roberta-base-squad2}, loaded through HuggingFace \texttt{pipeline("question-answering")}. This is an extractive QA model, so it selects an answer span directly from the document chunk.
-  \item \textbf{Answer selection:} For each question, every chunk is passed to the QA pipeline and the answer with the \textbf{highest confidence score} is returned as the final prediction.
+  \item \textbf{Chunking strategy:} Sentence-based. Each document is split into sentences using a regular expression in sentence-ending punctuation and each sentences are grouped into overlapping windows of \textbf{5 sentences} with a stride of \textbf{3 sentences}.
+  \item \textbf{QA model:} \texttt{deepset/roberta-base-squad2} is used, and loaded through HuggingFace. As this is an extractive QA model, it selects an answer span directly from the document chunk.
+  \item \textbf{Answer selection:} For each question, every chunk goes through the QA pipeline and the \textbf{highest confidence score} is returned as the final prediction.
 \end{itemize}
 
 \section*{2) Design Choices}
 
-\noindent\textbf{Decision 1 — What:} Sentence-based chunking instead of fixed character or token windows. \textbf{Why:} Sentence boundaries preserve coherent context, so the model is less likely to receive broken or incomplete meanings. This is especially useful for definition questions, where the answer often appears inside a full sentence.
+\noindent\textbf{Decision 1:}\\
+{What:} Sentence-based chunking instead of fixed character windows.\\
+{Why:} Sentence boundaries preserve context better, so the model is less likely to receive broken or incomplete meanings. This is particularly useful for answering definition questions, where the answer is often within a sentence.
 
 \vspace{4pt}
 
-\noindent\textbf{Decision 2 — What:} Using the highest raw model score to choose the final answer across chunks. \textbf{Why:} This keeps the system simple and matches the lab style. It avoids adding extra ranking methods beyond the module level, while still giving a clear way to compare candidate answers from different chunks.
+\noindent\textbf{Decision 2:}\\
+{What:} Using the highest model confidence score to choose the final answer.\\
+{Why:} To keep the method simple and consistent. It avoids adding extra ranking methods, while still giving a clear way to compare answers from different chunks.
 
 \section*{3) Error Analysis}
 
@@ -53,7 +57,7 @@
 \textit{Question:} What is computer security also known as?\\
 \textit{Gold Answer:} cybersecurity, digital security, or information technology (IT) security\\
 \textit{Prediction:} Social engineering\\
-\textit{Why wrong:} The correct answer appears near the beginning of the article, but the model selected a different term from another chunk. This shows that the highest-scoring chunk is not always the most relevant one, especially in long documents with many security-related definitions.
+\textit{Why wrong:} The correct answer is near the beginning of the article, but the model selected a different term from another chunk. This shows that the highest-scoring chunk is not always the most relevant one, especially in long documents with many security-related definitions.
 
 \vspace{4pt}
 
@@ -61,12 +65,11 @@
 \textit{Question:} What programming tool was used to create WannaCry?\\
 \textit{Gold Answer:} Microsoft Visual C++ 6.0\\
 \textit{Prediction:} EternalBlue\\
-\textit{Why wrong:} EternalBlue is strongly related to WannaCry, but it is the exploit used by the malware, not the programming tool used to create it. The model selected a nearby but semantically incorrect span because both terms appear in the same general topic area.
+\textit{Why wrong:} EternalBlue is strongly related to WannaCry, but it is the exploit used by the malware, not the programming tool used to create it. The model selected a nearby term but incorrect span because both terms appear in the same general topic area.
 
 \vspace{4pt}
 
-\noindent\textbf{Improvement Suggestion:} A simple improvement would be to use smaller chunks for very long documents or add a lightweight first-pass chunk filtering step based on keyword overlap. This could reduce distractor spans while still keeping the method within the assignment level.
-
+\noindent\textbf{Improvement Suggestion:} An improvement would be to use smaller chunks for long documents or add a lightweight first-pass chunk filtering step based on keyword overlap. This could reduce the distractor spans.
 \vspace{4pt}
 \hrule
 \vspace{2pt}
