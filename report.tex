@@ -17,7 +17,6 @@
 \setlist[itemize]{noitemsep, topsep=2pt, leftmargin=*}
 \pagestyle{plain}
 
-% ─────────────────────────────────────────────────────────────────────────────
 \begin{document}
 
 \begin{center}
@@ -26,61 +25,54 @@
 \end{center}
 
 \noindent
-\textbf{Name:} Cheng-Yuan King \hfill \textbf{Student ID:} [250195169]
+\textbf{Name:} Cheng-Yuan King \hfill \textbf{Student ID:} 250195169
 
 \vspace{4pt}
 \hrule
 \vspace{6pt}
 
-% ─────────────────────────────────────────────────────────────────────────────
 \section*{1) System Description}
 
 \begin{itemize}
-  \item \textbf{Chunking strategy:} Sentence-based sliding window. Documents are split into sentences using a regex on sentence-ending punctuation. Sentences are grouped into overlapping windows of \textbf{5 sentences} with a stride of \textbf{3 sentences} (2-sentence overlap between consecutive chunks).
-  \item \textbf{QA model:} \texttt{deepset/roberta-base-squad2} — a RoBERTa-base model fine-tuned on SQuAD 2.0, loaded via the HuggingFace \texttt{pipeline("question-answering")} interface.
-  \item \textbf{Answer selection:} The answer span with the \textbf{highest raw confidence score} across all chunks is returned as the final prediction.
+  \item \textbf{Chunking strategy:} Sentence-based sliding window. Each document is split into sentences using a regular expression on sentence-ending punctuation. Sentences are grouped into overlapping windows of \textbf{5 sentences} with a stride of \textbf{3 sentences}.
+  \item \textbf{QA model:} \texttt{deepset/roberta-base-squad2}, loaded through HuggingFace \texttt{pipeline("question-answering")}. This is an extractive QA model, so it selects an answer span directly from the document chunk.
+  \item \textbf{Answer selection:} For each question, every chunk is passed to the QA pipeline and the answer with the \textbf{highest confidence score} is returned as the final prediction.
 \end{itemize}
 
-\vspace{2pt}
-
-% ─────────────────────────────────────────────────────────────────────────────
 \section*{2) Design Choices}
 
-\noindent\textbf{Decision 1 — What:} Sentence-based chunking rather than fixed-length token or character windows. \textbf{Why:} Sentence boundaries preserve grammatical and semantic coherence, ensuring the model always receives complete, interpretable contexts. Fixed-length splits risk cutting mid-sentence, which can obscure the answer span or degrade model confidence.
+\noindent\textbf{Decision 1 — What:} Sentence-based chunking instead of fixed character or token windows. \textbf{Why:} Sentence boundaries preserve coherent context, so the model is less likely to receive broken or incomplete meanings. This is especially useful for definition questions, where the answer often appears inside a full sentence.
 
 \vspace{4pt}
 
-\noindent\textbf{Decision 2 — What:} Selecting the answer by highest raw confidence score across all chunks. \textbf{Why:} The model's confidence score jointly reflects span quality and context–question relevance, making it a reliable proxy for answer correctness without requiring any secondary re-ranking step or score normalisation.
+\noindent\textbf{Decision 2 — What:} Using the highest raw model score to choose the final answer across chunks. \textbf{Why:} This keeps the system simple and matches the lab style. It avoids adding extra ranking methods beyond the module level, while still giving a clear way to compare candidate answers from different chunks.
 
-\vspace{2pt}
-
-% ─────────────────────────────────────────────────────────────────────────────
 \section*{3) Error Analysis}
 
 \noindent\textbf{Incorrect Example 1:}\\
-\textit{Question:} What is eavesdropping?\\
-\textit{Gold Answer:} the act of surreptitiously listening to a private computer conversation, usually between hosts on a network\\
-\textit{Prediction:} the car's onboard microphones\\
-\textit{Why wrong:} The document contains multiple passages that mention ``listening''; the chunk holding the correct definitional sentence received a lower model confidence score than a chunk about vehicle surveillance, causing the wrong span to be selected.
+\textit{Question:} What is computer security also known as?\\
+\textit{Gold Answer:} cybersecurity, digital security, or information technology (IT) security\\
+\textit{Prediction:} Social engineering\\
+\textit{Why wrong:} The correct answer appears near the beginning of the article, but the model selected a different term from another chunk. This shows that the highest-scoring chunk is not always the most relevant one, especially in long documents with many security-related definitions.
 
 \vspace{4pt}
 
 \noindent\textbf{Incorrect Example 2:}\\
 \textit{Question:} What programming tool was used to create WannaCry?\\
 \textit{Gold Answer:} Microsoft Visual C++ 6.0\\
-\textit{Prediction:} Wanakiwi\\
-\textit{Why wrong:} Wanakiwi (a decryption tool) appears in close proximity to programming-related language in the same chunk as the gold answer. Without domain-specific fine-tuning, the model cannot reliably distinguish the correct named entity from a confusable distractor in the same context window.
+\textit{Prediction:} EternalBlue\\
+\textit{Why wrong:} EternalBlue is strongly related to WannaCry, but it is the exploit used by the malware, not the programming tool used to create it. The model selected a nearby but semantically incorrect span because both terms appear in the same general topic area.
 
 \vspace{4pt}
 
-\noindent\textbf{Improvement Suggestion:} Reducing the chunk window size for very long documents (e.g., window = 3 sentences for documents over 8{,}000 words) would lower distractor density per chunk, reducing the risk of the model selecting a plausible but incorrect span from a crowded context.
+\noindent\textbf{Improvement Suggestion:} A simple improvement would be to use smaller chunks for very long documents or add a lightweight first-pass chunk filtering step based on keyword overlap. This could reduce distractor spans while still keeping the method within the assignment level.
 
 \vspace{4pt}
 \hrule
 \vspace{2pt}
 {\footnotesize
-\textbf{Development results:} EM = 43.33, F1 = 61.42 over 30 questions (3 Wikipedia documents).
-Code: \texttt{src/qa\_system.py} (pipeline), \texttt{src/build\_dataset.py} (data), \texttt{src/qa\_evaluate.py} (evaluation).
+\textbf{Final results:} EM = 43.33, F1 = 60.14 over 30 questions on 3 Wikipedia documents. \\
+Code files: \texttt{src/build\_dataset.py}, \texttt{src/qa\_system.py}, and \texttt{src/qa\_evaluate.py}.
 }
 
 \end{document}

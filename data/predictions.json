@@ -1,7 +1,7 @@
 [
   {
     "question_id": "q01",
-    "answer": "technology that is used to implement secure operating systems"
+    "answer": "Social engineering"
   },
   {
     "question_id": "q02",
@@ -29,7 +29,7 @@
   },
   {
     "question_id": "q08",
-    "answer": "more than $2 billion"
+    "answer": "$2 billion"
   },
   {
     "question_id": "q09",
@@ -93,7 +93,7 @@
   },
   {
     "question_id": "q24",
-    "answer": "Wanakiwi"
+    "answer": "EternalBlue"
   },
   {
     "question_id": "q25",

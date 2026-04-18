@@ -2,83 +2,67 @@ import json
 import evaluate
 
 
-# Load metric
-
 squad_metric = evaluate.load("squad")
 
 
-# Main
 
 def main():
-    # Load predictions
     with open("data/predictions.json", "r", encoding="utf-8") as f:
         predictions = json.load(f)
 
-    # Load gold answers
     with open("data/gold_answers.json", "r", encoding="utf-8") as f:
-        gold = json.load(f)
+        gold_answers = json.load(f)
 
-    # Lookup for gold answers by question_id
-    gold_lookup = {item["question_id"]: item["answer"] for item in gold}
+    gold_lookup = {}
+    for item in gold_answers:
+        gold_lookup[item["question_id"]] = item["answer"]
 
-    # Format for squad metric
-    # predictions: list of {"id": ..., "prediction_text": ...}
-    # references:  list of {"id": ..., "answers": {"text": [...], "answer_start": [0]}}
     formatted_predictions = []
     formatted_references = []
 
     for item in predictions:
         qid = item["question_id"]
         pred_text = item["answer"]
-        gold_text = gold_lookup.get(qid, "")
+        gold_text = gold_lookup[qid]
 
         formatted_predictions.append({
             "id": qid,
-            "prediction_text": pred_text,
+            "prediction_text": pred_text
         })
 
         formatted_references.append({
             "id": qid,
             "answers": {
                 "text": [gold_text],
-                "answer_start": [0],
-            },
+                "answer_start": [0]
+            }
         })
 
-    # Compute EM and F1
     results = squad_metric.compute(
         predictions=formatted_predictions,
-        references=formatted_references,
+        references=formatted_references
     )
-
-    exact_match = results["exact_match"]
-    f1 = results["f1"]
 
     print("Evaluation Results")
     print("------------------")
-    print("Exact Match:", round(exact_match, 2))
-    print("F1 Score:   ", round(f1, 2))
+    print("Exact Match:", round(results["exact_match"], 2))
+    print("F1 Score:", round(results["f1"], 2))
     print()
-
-    # Per-question breakdown
     print("Per-question breakdown:")
     print()
-    for pred, ref in zip(formatted_predictions, formatted_references):
-        qid = pred["id"]
-        pred_text = pred["prediction_text"]
-        gold_text = ref["answers"]["text"][0]
 
-        per = squad_metric.compute(
+    for i in range(len(formatted_predictions)):
+        pred = formatted_predictions[i]
+        ref = formatted_references[i]
+
+        per_question = squad_metric.compute(
             predictions=[pred],
-            references=[ref],
+            references=[ref]
         )
 
-        em = int(per["exact_match"])
-        f1_per = round(per["f1"], 1)
-
-        print("[" + qid + "] EM=" + str(em) + "  F1=" + str(f1_per))
-        print("  Gold:", gold_text)
-        print("  Pred:", pred_text)
+        print("[" + pred["id"] + "] EM=" + str(int(per_question["exact_match"])) + " F1=" + str(round(per_question["f1"], 1)))
+        print("Gold:", ref["answers"]["text"][0])
+        print("Pred:", pred["prediction_text"])
         print()
 
 

@@ -1,109 +1,108 @@
 import json
 import re
-import os
 import torch
 from transformers import pipeline
 
 
-# Configuration
-
-MODEL_NAME   = "deepset/roberta-base-squad2"
-WINDOW_SIZE  = 5    # sentences per chunk
-STRIDE       = 3    # sentences to advance per step
+MODEL_NAME = "deepset/roberta-base-squad2"
+WINDOW_SIZE = 5
+STRIDE = 3
 MAX_ANSWER_LEN = 50
 
-
-# Device
 
 device = 0 if torch.cuda.is_available() else -1
 
 
-# Chunking
 
 def split_sentences(text):
-    """Split text into sentences using regex."""
-    sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
-    return [s.strip() for s in sentences if len(s.strip()) > 15]
+    """Split text into sentences."""
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    cleaned_sentences = []
+
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if len(sentence) > 15:
+            cleaned_sentences.append(sentence)
+
+    return cleaned_sentences
 
 
-def chunk_document(text, window=WINDOW_SIZE, stride=STRIDE):
-    """Split document into overlapping sentence-window chunks."""
+
+def chunk_document(text):
+    """Split a document into overlapping chunks."""
     sentences = split_sentences(text)
 
-    if not sentences:
+    if len(sentences) == 0:
         return [text]
 
     chunks = []
-    i = 0
-    while i < len(sentences):
-        chunk = " ".join(sentences[i : i + window])
-        if chunk.strip():
+    start = 0
+
+    while start < len(sentences):
+        chunk = " ".join(sentences[start:start + WINDOW_SIZE])
+        if chunk.strip() != "":
             chunks.append(chunk)
-        if i + window >= len(sentences):
+
+        if start + WINDOW_SIZE >= len(sentences):
             break
-        i += stride
 
-    return chunks if chunks else [text]
+        start = start + STRIDE
+
+    return chunks
 
 
-# Question Answering
 
 def answer_question(qa_pipe, question, document):
-    """Run QA model over all chunks, return the answer with the highest score."""
+    """Find the best answer from all document chunks."""
     chunks = chunk_document(document)
-
     best_answer = ""
-    best_score  = -1.0
+    best_score = -1
 
     for chunk in chunks:
         result = qa_pipe(
             question=question,
             context=chunk,
-            max_answer_len=MAX_ANSWER_LEN,
+            max_answer_len=MAX_ANSWER_LEN
         )
+
         if result["score"] > best_score:
-            best_score  = result["score"]
+            best_score = result["score"]
             best_answer = result["answer"]
 
-    answer = best_answer.strip().replace('\n', ' ')
-    return answer if answer else "unknown"
+    best_answer = best_answer.strip().replace("\n", " ")
+
+    if best_answer == "":
+        return "unknown"
+
+    return best_answer
 
 
-# Main
 
 def main():
-    script_dir   = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(script_dir)
-
-    if os.path.exists(os.path.join(script_dir, "input.json")):
-        input_path  = os.path.join(script_dir, "input.json")
-        output_path = os.path.join(script_dir, "predictions.json")
-    elif os.path.exists(os.path.join(project_root, "data", "input.json")):
-        input_path  = os.path.join(project_root, "data", "input.json")
-        output_path = os.path.join(project_root, "data", "predictions.json")
-    else:
-        raise FileNotFoundError("Could not find input.json.")
-
-    # Load model
     print("Loading model:", MODEL_NAME)
     qa_pipe = pipeline(
         "question-answering",
         model=MODEL_NAME,
-        device=device,
+        device=device
     )
-    print("Model ready. Device:", "CUDA" if device == 0 else "CPU")
+
+    if device == 0:
+        print("Model ready. Device: CUDA")
+    else:
+        print("Model ready. Device: CPU")
+
     print()
 
-    # Load input
-    with open(input_path, "r", encoding="utf-8") as f:
+    with open("data/input.json", "r", encoding="utf-8") as f:
         data = json.load(f)
-    print("Loaded", len(data), "questions from", input_path)
+
+    print("Loaded", len(data), "questions from data/input.json")
     print()
 
-    # Run pipeline
     predictions = []
+
     for item in data:
-        qid      = item["question_id"]
+        qid = item["question_id"]
         question = item["question"]
         document = item["document"]
 
@@ -111,18 +110,17 @@ def main():
 
         predictions.append({
             "question_id": qid,
-            "answer":      answer,
+            "answer": answer
         })
 
-        print("[" + qid + "]", question[:70])
-        print("  ->", answer)
+        print("[" + qid + "]", question)
+        print("->", answer)
         print()
 
-    # Save predictions
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open("data/predictions.json", "w", encoding="utf-8") as f:
         json.dump(predictions, f, indent=2, ensure_ascii=False)
 
-    print("Predictions saved to:", output_path)
+    print("Predictions saved to: data/predictions.json")
     print("Total:", len(predictions))
 
 
